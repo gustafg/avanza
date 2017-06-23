@@ -3,6 +3,7 @@ import {EventEmitter} from 'events';
 
 import Request from './Request';
 import Socket from './Socket';
+const mbankid = require('./mbankid-auth');
 
 import * as constants from './constants'
 
@@ -412,18 +413,17 @@ export default class Avanza {
     /**
      * Authenticate credentials
      *
-     * @param credentials An object containing the properties username and password
+     * @param credentials An object containing the properties username and password or username and personnr (if using mobile bankid for auth)
      * @param force Do authentication even if the user is already authenticated
      */
     authenticate(credentials, force) {
-
         let that = this;
         return new Promise((resolve, reject) => {
 
             if(
                 typeof credentials === 'undefined' ||
                 !credentials.username ||
-                !credentials.password
+                (!credentials.password && !credentials.personnr)
             ) {
                 reject('Avanza.authenticate received no credentials.')
             }
@@ -438,31 +438,44 @@ export default class Avanza {
 
             } else {
 
+                let authenticate;
                 let securityToken;
 
-                const data = {
-                    'maxInactiveMinutes': constants.MAX_INACTIVE_MINUTES,
-                    'password': credentials.password,
-                    'username': credentials.username
-                }
-
-                /**
-                 * Create the authentication request
-                 */
-                const authenticate = new Request({
-                    path: constants.AUTHENTICATION_PATH,
-                    headers: {
-                        'Content-Length': JSON.stringify(data).length
-                    },
-                    data: data,
-                    onEnd: response => {
-
-                        /**
-                         * Parse the securitytoken from the headers of the responsee
-                         */
-                        securityToken = response.headers['x-securitytoken'];
+                if (credentials.personnr) {
+                    authenticate = mbankid.invoke_auth_chain(credentials)
+                        .then(credentials => {
+                            securityToken = credentials.aza_usertoken;
+                            return Promise.resolve({
+                                authenticationSession: credentials.cookies['csid'],
+                                pushSubscriptionId   : credentials.kontooversikt.pushSubscriptionid,
+                                customerId           : credentials.custinfo.customerId
+                            });
+                        });
+                } else {
+                    const data = {
+                        'maxInactiveMinutes': constants.MAX_INACTIVE_MINUTES,
+                        'password': credentials.password,
+                        'username': credentials.username
                     }
-                });
+
+                    /**
+                     * Create the authentication request
+                     */
+                    authenticate = new Request({
+                        path: constants.AUTHENTICATION_PATH,
+                        headers: {
+                            'Content-Length': JSON.stringify(data).length
+                        },
+                        data: data,
+                        onEnd: response => {
+
+                            /**
+                             * Parse the securitytoken from the headers of the responsee
+                             */
+                            securityToken = response.headers['x-securitytoken'];
+                        }
+                    });
+                }
 
                 authenticate.then(response => {
 

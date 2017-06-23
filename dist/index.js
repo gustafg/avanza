@@ -30,6 +30,8 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { de
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
+var mbankid = require('./mbankid-auth');
+
 var Avanza = function () {
     function Avanza(options) {
         _classCallCheck(this, Avanza);
@@ -155,7 +157,7 @@ var Avanza = function () {
     }, {
         key: 'getTransactions',
         value: function getTransactions(accountId) {
-            var options = arguments.length <= 1 || arguments[1] === undefined ? {} : arguments[1];
+            var options = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
 
             return new _Request2.default({
                 path: constants.TRANSACTIONS_PATH.replace('{0}', accountId) + '?' + _querystring2.default.stringify(options),
@@ -374,7 +376,7 @@ var Avanza = function () {
     }, {
         key: 'getChartdata',
         value: function getChartdata(id) {
-            var period = arguments.length <= 1 || arguments[1] === undefined ? constants.ONE_YEAR : arguments[1];
+            var period = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : constants.ONE_YEAR;
 
             return new _Request2.default({
                 path: constants.CHARTDATA_PATH.replace('{0}', id) + '?' + _querystring2.default.stringify({
@@ -489,7 +491,7 @@ var Avanza = function () {
         /**
          * Authenticate credentials
          *
-         * @param credentials An object containing the properties username and password
+         * @param credentials An object containing the properties username and password or username and personnr (if using mobile bankid for auth)
          * @param force Do authentication even if the user is already authenticated
          */
 
@@ -501,7 +503,7 @@ var Avanza = function () {
             var that = this;
             return new Promise(function (resolve, reject) {
 
-                if (typeof credentials === 'undefined' || !credentials.username || !credentials.password) {
+                if (typeof credentials === 'undefined' || !credentials.username || !credentials.password && !credentials.personnr) {
                     reject('Avanza.authenticate received no credentials.');
                 }
 
@@ -513,20 +515,29 @@ var Avanza = function () {
                         subscriptionId: that.subscriptionId
                     });
                 } else {
-                    (function () {
 
-                        var securityToken = void 0;
+                    var authenticate = void 0;
+                    var securityToken = void 0;
 
+                    if (credentials.personnr) {
+                        authenticate = mbankid.invoke_auth_chain(credentials).then(function (credentials) {
+                            securityToken = credentials.aza_usertoken;
+                            return Promise.resolve({
+                                authenticationSession: credentials.cookies['csid'],
+                                pushSubscriptionId: credentials.kontooversikt.pushSubscriptionid,
+                                customerId: credentials.custinfo.customerId
+                            });
+                        });
+                    } else {
                         var data = {
                             'maxInactiveMinutes': constants.MAX_INACTIVE_MINUTES,
                             'password': credentials.password,
                             'username': credentials.username
-                        };
 
-                        /**
-                         * Create the authentication request
-                         */
-                        var authenticate = new _Request2.default({
+                            /**
+                             * Create the authentication request
+                             */
+                        };authenticate = new _Request2.default({
                             path: constants.AUTHENTICATION_PATH,
                             headers: {
                                 'Content-Length': JSON.stringify(data).length
@@ -540,28 +551,28 @@ var Avanza = function () {
                                 securityToken = response.headers['x-securitytoken'];
                             }
                         });
+                    }
 
-                        authenticate.then(function (response) {
+                    authenticate.then(function (response) {
 
-                            that.isAuthenticated = true;
-                            that.securityToken = securityToken;
-                            that.authenticationSession = response.authenticationSession;
-                            that.subscriptionId = response.pushSubscriptionId;
-                            that.customerId = response.customerId;
+                        that.isAuthenticated = true;
+                        that.securityToken = securityToken;
+                        that.authenticationSession = response.authenticationSession;
+                        that.subscriptionId = response.pushSubscriptionId;
+                        that.customerId = response.customerId;
 
-                            that.socket.subscriptionId = response.pushSubscriptionId;
+                        that.socket.subscriptionId = response.pushSubscriptionId;
 
-                            resolve({
-                                securityToken: that.securityToken,
-                                authenticationSession: that.authenticationSession,
-                                subscriptionId: that.subscriptionId
-                            });
-
-                            _this3._events.emit('authenticate');
-                        }).catch(function (e) {
-                            return reject(e);
+                        resolve({
+                            securityToken: that.securityToken,
+                            authenticationSession: that.authenticationSession,
+                            subscriptionId: that.subscriptionId
                         });
-                    })();
+
+                        _this3._events.emit('authenticate');
+                    }).catch(function (e) {
+                        return reject(e);
+                    });
                 }
             });
         }

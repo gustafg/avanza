@@ -93,18 +93,16 @@ var Socket = function () {
                             id: _this._id++
                         }]));
                     } else if (message.channel === '/meta/connect') {
-                        (function () {
-                            _this._events.emit('connect', message);
-                            var that = _this;
-                            setTimeout(function () {
-                                that._socket.send(JSON.stringify([{
-                                    channel: '/meta/connect',
-                                    clientId: that._clientId,
-                                    connectionType: 'websocket',
-                                    id: that._id++
-                                }]));
-                            }, 100);
-                        })();
+                        _this._events.emit('connect', message);
+                        var that = _this;
+                        setTimeout(function () {
+                            that._socket.send(JSON.stringify([{
+                                channel: '/meta/connect',
+                                clientId: that._clientId,
+                                connectionType: 'websocket',
+                                id: that._id++
+                            }]));
+                        }, 100);
                     } else if (message.channel === '/meta/subscribe') {
                         _this._events.emit('subscribe', message);
                     } else if (message.channel.indexOf('/quotes/') !== -1) {
@@ -257,7 +255,7 @@ var Socket = function () {
         value: function subscribe(id) {
             var _this3 = this;
 
-            var channels = arguments.length <= 1 || arguments[1] === undefined ? ['quotes'] : arguments[1];
+            var channels = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : ['quotes'];
 
 
             if (!this.isOpened()) {
