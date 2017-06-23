@@ -24,6 +24,7 @@
   ],
   "homepage": "https://github.com/fhqvst/avanza#readme",
   "dependencies": {
+    "cheerio": "^1.0.0-rc.1",
     "ws": "3.2.0"
   },
   "devDependencies": {
