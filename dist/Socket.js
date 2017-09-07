@@ -142,6 +142,7 @@ var Socket = function () {
                     } else if (message.channel.indexOf('/orderdepths/') !== -1) {
                         var _data3 = message.data;
                         _this._events.emit('orderdepths', {
+                            orderbookId: _data3.orderbookId,
                             levels: _data3.levels.map(function (level) {
                                 return {
                                     buy: level.buySide,

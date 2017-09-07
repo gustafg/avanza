@@ -141,6 +141,7 @@ export default class Socket {
                     else if(message.channel.indexOf('/orderdepths/') !== -1) {
                         const data = message.data
                         this._events.emit('orderdepths', {
+                            orderbookId: data.orderbookId,
                             levels: data.levels.map(level => ({
                                 buy: level.buySide,
                                 sell: level.sellSide
